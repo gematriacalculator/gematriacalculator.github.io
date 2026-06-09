@@ -1,0 +1,24 @@
+{
+  "name": "English",
+  "nativeName": "English",
+  "dir": "ltr",
+  "titleSuffix": "Gematria Calculator",
+  "meta": {
+    "homeTitle": "Gematria Calculator - Free Online Word, Name & Hebrew Gematria Tool",
+    "homeDescription": "Use this free Gematria Calculator to calculate English, reverse, name, and Hebrew gematria values. Enter any word, phrase, or name and instantly find its number value.",
+    "genericDescription": "Use this free multilingual Gematria Calculator to calculate word, name, phrase, and Hebrew values with a clear letter-by-letter breakdown."
+  },
+  "phrases": {},
+  "ui": {
+    "languages": {
+      "en": "English",
+      "es": "Espa\u00f1ol",
+      "fr": "Fran\u00e7ais",
+      "de": "Deutsch",
+      "pt": "Portugu\u00eas",
+      "hi": "\u0939\u093f\u0928\u094d\u0926\u0940",
+      "he": "\u05e2\u05d1\u05e8\u05d9\u05ea"
+    }
+  },
+  "attributes": {}
+}
