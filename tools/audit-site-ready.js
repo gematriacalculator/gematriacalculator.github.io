@@ -49,6 +49,10 @@ function routeFor(file) {
   return { route: `/${localRel.replace(/\.html$/, '')}`, localized, lang: localized ? parts[0] : 'en' };
 }
 
+function isVerificationFile(file) {
+  return /^google[a-z0-9]+\.html$/i.test(path.basename(file));
+}
+
 function urlFor(lang, route) {
   if (lang === 'en') return `${site}${route === '/' ? '/' : route}`;
   if (route === '/') return `${site}/${lang}/`;
@@ -66,7 +70,7 @@ function fileForPathname(pathname) {
   return asDirectory;
 }
 
-const htmlFiles = walk(root);
+const htmlFiles = walk(root).filter((file) => !isVerificationFile(file));
 const sitemapPath = path.join(root, 'sitemap.xml');
 const sitemap = fs.existsSync(sitemapPath) ? fs.readFileSync(sitemapPath, 'utf8') : '';
 const sitemapUrls = Array.from(sitemap.matchAll(/<loc>(.*?)<\/loc>/g)).map((match) => match[1]);

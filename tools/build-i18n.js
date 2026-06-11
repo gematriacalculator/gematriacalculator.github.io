@@ -519,6 +519,7 @@ function writeJsonFiles() {
 function walkHtml(dir, files = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (entry.name === 'node_modules' || entry.name === '.git' || localizedLanguages.includes(entry.name)) continue;
+    if (entry.isFile() && /^google[a-z0-9]+\.html$/i.test(entry.name)) continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) walkHtml(full, files);
     if (entry.isFile() && entry.name.endsWith('.html')) files.push(full);
@@ -596,6 +597,182 @@ function setCanonical(html, href) {
 
 function setOgUrl(html, href) {
   return html.replace(/(<meta\s+property="og:url"\s+content=")[^"]*(")/i, `$1${href}$2`);
+}
+
+function stripHtml(value) {
+  return htmlUnescape(String(value)
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim());
+}
+
+function pageLabel(html, route) {
+  if (route === '/') return 'Home';
+  const h1 = (html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) || [null, ''])[1];
+  if (h1) return stripHtml(h1);
+  const title = (html.match(/<title>([\s\S]*?)<\/title>/i) || [null, ''])[1];
+  return stripHtml(title).replace(/\s+-\s+.*$/, '') || 'Gematria Calculator';
+}
+
+function routePrefix(lang) {
+  return lang === 'en' ? '' : `/${lang}`;
+}
+
+function localPath(lang, route) {
+  if (lang === 'en') return route === '/' ? '/' : route;
+  if (route === '/') return `/${lang}/`;
+  return `/${lang}${route}${route.endsWith('/') ? '' : '/'}`;
+}
+
+function jsonLd(data) {
+  return `<script type="application/ld+json">${JSON.stringify(data)}</script>`;
+}
+
+function insertBeforeHeadClose(html, addition) {
+  return html.replace('</head>', `${addition}</head>`);
+}
+
+function insertBeforeMainClose(html, addition) {
+  return html.replace('</main>', `${addition}</main>`);
+}
+
+function ensureBreadcrumbs(html, lang, route, href) {
+  const label = pageLabel(html, route);
+  const localizedHome = lang === 'en' ? 'Home' : staticTranslationFor(lang, 'Home');
+  const localizedLabel = lang === 'en' ? label : staticTranslationFor(lang, label);
+  let next = html;
+
+  if (!/<nav\s+class="breadcrumbs"/i.test(next)) {
+    const breadcrumb = route === '/'
+      ? `<nav class="breadcrumbs" aria-label="Breadcrumb"><ol><li><span aria-current="page">${htmlEscape(localizedHome)}</span></li></ol></nav>`
+      : `<nav class="breadcrumbs" aria-label="Breadcrumb"><ol><li><a href="${localPath(lang, '/')}">${htmlEscape(localizedHome)}</a></li><li><span aria-current="page">${htmlEscape(localizedLabel)}</span></li></ol></nav>`;
+    next = next.replace('<main id="main-content">', `<main id="main-content">${breadcrumb}`);
+  }
+
+  if (!/"@type"\s*:\s*"BreadcrumbList"/.test(next)) {
+    const itemListElement = route === '/'
+      ? [{ '@type': 'ListItem', position: 1, name: localizedHome, item: href }]
+      : [
+        { '@type': 'ListItem', position: 1, name: localizedHome, item: urlFor(lang, '/') },
+        { '@type': 'ListItem', position: 2, name: localizedLabel, item: href },
+      ];
+    next = insertBeforeHeadClose(next, jsonLd({
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement,
+    }));
+  }
+
+  return next;
+}
+
+function faqPairsForRoute(route) {
+  const generic = [
+    ['Which calculator should I use from this page?', 'Use the calculator that matches the language and method you want to study, then keep the same method for related comparisons.'],
+    ['Can I use these pages for personal decisions?', 'No. Gematria pages are educational and interpretive, not financial, legal, medical, religious, or life decision advice.'],
+    ['Why should I check the letter breakdown?', 'The breakdown shows which letters were counted and helps you verify the total before comparing or interpreting a result.'],
+  ];
+  const byRoute = {
+    '/about': [
+      ['What is the purpose of this website?', 'The site explains gematria calculators, letter values, examples, and responsible interpretation in a clear educational format.'],
+      ['Who is this site for?', 'It is for readers who want to calculate word, name, phrase, and Hebrew letter values while seeing how each result was formed.'],
+      ['How is content reviewed?', 'Pages focus on clear method labels, original explanations, calculator examples, and responsible language about symbolic interpretation.'],
+    ],
+    '/blog/': [
+      ['Which gematria article should I read first?', 'Start with the beginner guide, then open the method guide that matches the calculator you plan to use.'],
+      ['Are the blog guides connected to the calculators?', 'Yes. The guides explain the same methods used by the calculator pages and link to related tools for practical checking.'],
+      ['Are blog interpretations predictive?', 'No. The articles treat gematria as symbolic education and reflection, not prediction or professional advice.'],
+    ],
+    '/privacy-policy': [
+      ['Does the calculator save my input?', 'No. Calculator input is processed in your browser. Shared result URLs may contain the text you choose to include.'],
+      ['Can ads or analytics use cookies?', 'Third-party services such as advertising or analytics providers may use cookies or similar technologies under their own policies.'],
+      ['How can I ask a privacy question?', 'Use the contact page and avoid sending sensitive personal information.'],
+    ],
+    '/terms': [
+      ['What is this website allowed for?', 'The website is for personal, educational, symbolic, spiritual, research, journaling, and entertainment use.'],
+      ['Are calculator results guaranteed?', 'No. Users should verify spelling, method, supported characters, and the visible letter breakdown before relying on a result.'],
+      ['Can I copy the website content?', 'You may link to public pages, but you may not republish substantial original content as your own without permission.'],
+    ],
+    '/disclaimer': [
+      ['Is gematria professional advice?', 'No. Gematria content is symbolic and educational, not financial, legal, medical, religious, emergency, or professional advice.'],
+      ['Can gematria predict events?', 'No. The website does not treat number values as proof, prediction, or guaranteed messages.'],
+      ['Should I verify calculator results?', 'Yes. Always review the selected method, spelling, unsupported characters, and letter breakdown.'],
+    ],
+  };
+  return byRoute[route] || generic;
+}
+
+function extractFaqPairs(html) {
+  const pairs = [];
+  html.replace(/<details[^>]*class="[^"]*\bfaq-item\b[^"]*"[^>]*>[\s\S]*?<summary>([\s\S]*?)<\/summary>[\s\S]*?<p>([\s\S]*?)<\/p>[\s\S]*?<\/details>/gi, (match, question, answer) => {
+    pairs.push([stripHtml(question), stripHtml(answer)]);
+    return match;
+  });
+  return pairs;
+}
+
+function faqSection(pairs, heading = 'FAQ') {
+  return `<section class="content-section faq-section" id="faq"><div class="section-heading"><h2>${htmlEscape(heading)}</h2></div><div class="faq-list">${pairs.map(([question, answer]) => `<details class="faq-item"><summary>${htmlEscape(question)}</summary><p>${htmlEscape(answer)}</p></details>`).join('')}</div></section>`;
+}
+
+function ensureFaq(html, lang, route) {
+  let next = html;
+  let pairs = extractFaqPairs(next);
+
+  if (!pairs.length) {
+    pairs = faqPairsForRoute(route);
+    next = insertBeforeMainClose(next, faqSection(pairs));
+  }
+
+  if (!/"@type"\s*:\s*"FAQPage"/.test(next)) {
+    next = insertBeforeHeadClose(next, jsonLd({
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: pairs.map(([question, answer]) => ({
+        '@type': 'Question',
+        name: lang === 'en' ? question : staticTranslationFor(lang, question),
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: lang === 'en' ? answer : staticTranslationFor(lang, answer),
+        },
+      })),
+    }));
+  }
+
+  return next;
+}
+
+function relatedCalculatorSection() {
+  const cards = [
+    ['/english-gematria-calculator', 'English Gematria Calculator', 'Calculate English A6 to Z156 values with a clear letter-by-letter breakdown.'],
+    ['/reverse-gematria-calculator', 'Reverse Gematria Calculator', 'Compare reverse alphabet values where A equals 26 and Z equals 1.'],
+    ['/name-gematria-calculator', 'Name Gematria Calculator', 'Calculate first names, full names, nicknames, and initials consistently.'],
+    ['/hebrew-gematria-calculator', 'Hebrew Gematria Calculator', 'Calculate standard Hebrew letter values and common final forms.'],
+  ];
+  return `<section class="content-section related-calculators"><div class="section-heading"><h2>Related Calculators</h2><p>Use the matching calculator when you want to test a word, name, phrase, or Hebrew spelling.</p></div><div class="card-grid">${cards.map(([href, title, text]) => `<article class="info-card"><h3><a href="${href}">${htmlEscape(title)}</a></h3><p>${htmlEscape(text)}</p></article>`).join('')}</div></section>`;
+}
+
+function ensureRelatedCalculators(html, route) {
+  let next = html
+    .replace(/<h2>Gematria Calculator Types<\/h2>/g, '<h2>Related Calculators</h2>')
+    .replace(/<h2>Related Guides and Tools<\/h2>/g, '<h2>Related Calculators and Guides</h2>')
+    .replace(/<h2>What We Offer<\/h2>/g, '<h2>Related Calculators</h2>');
+
+  if (!/Related Calculators/i.test(next)) {
+    next = insertBeforeMainClose(next, relatedCalculatorSection());
+  }
+
+  return next;
+}
+
+function enhanceSeoChecklist(html, lang, route, href) {
+  if (route === '/404') return html;
+  let next = ensureRelatedCalculators(html, route);
+  next = ensureFaq(next, lang, route);
+  next = ensureBreadcrumbs(next, lang, route, href);
+  return next;
 }
 
 function languageTag(lang) {
@@ -732,6 +909,7 @@ function renderPage(sourceHtml, lang, route) {
   html = setMeta(html, { type: 'name', value: 'twitter:description' }, description);
   html = ensureI18nScript(html);
   html = normalizeFooterLinks(html);
+  html = enhanceSeoChecklist(html, lang, route, href);
   if (lang !== 'en') {
     html = rewriteInternalLinks(html, lang);
     html = translateStaticHtml(html, lang);

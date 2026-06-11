@@ -8,6 +8,7 @@ const ignoredDirs = new Set(['.git', 'node_modules', ...languages]);
 function walkSourceHtml(dir, files = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (ignoredDirs.has(entry.name)) continue;
+    if (entry.isFile() && /^google[a-z0-9]+\.html$/i.test(entry.name)) continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) walkSourceHtml(full, files);
     if (entry.isFile() && entry.name.endsWith('.html')) files.push(full);
