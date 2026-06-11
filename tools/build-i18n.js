@@ -6,6 +6,7 @@ const site = 'https://gematriacalculator.github.io';
 const languages = ['en', 'es', 'fr', 'de', 'pt', 'hi', 'he'];
 const localizedLanguages = languages.filter((lang) => lang !== 'en');
 const contentTranslations = loadContentTranslations();
+const plainInfoRoutes = new Set(['/about', '/contact', '/privacy-policy', '/terms', '/disclaimer']);
 
 const languageNames = {
   en: 'English',
@@ -769,6 +770,7 @@ function ensureRelatedCalculators(html, route) {
 
 function enhanceSeoChecklist(html, lang, route, href) {
   if (route === '/404') return html;
+  if (plainInfoRoutes.has(route)) return ensureBreadcrumbs(html, lang, route, href);
   let next = ensureRelatedCalculators(html, route);
   next = ensureFaq(next, lang, route);
   next = ensureBreadcrumbs(next, lang, route, href);

@@ -4,6 +4,7 @@ const path = require('path');
 const root = path.resolve(__dirname, '..');
 const site = 'https://gematriacalculator.github.io';
 const localizedPrefixes = new Set(['de', 'es', 'fr', 'he', 'hi', 'pt']);
+const plainInfoRoutes = new Set(['/about', '/contact', '/privacy-policy', '/terms', '/disclaimer']);
 const calculatorPaths = [
   '/english-gematria-calculator',
   '/reverse-gematria-calculator',
@@ -71,6 +72,8 @@ for (const file of htmlFiles) {
   const { route, lang, rel } = routeFor(file);
   const robotsMeta = meta(html, 'name', 'robots').toLowerCase();
   if (robotsMeta !== 'index, follow') continue;
+  const normalizedRoute = route !== '/' && route.endsWith('/') ? route.slice(0, -1) : route;
+  const isPlainInfoRoute = plainInfoRoutes.has(normalizedRoute);
 
   const title = titleOf(html).replace(/&amp;/g, '&');
   const description = meta(html, 'name', 'description').replace(/&amp;/g, '&');
@@ -94,8 +97,10 @@ for (const file of htmlFiles) {
   if (hreflangCount < 8) issues.push(`${rel}: missing hreflang tags`);
   if (ogTags.length < 5) issues.push(`${rel}: incomplete Open Graph tags`);
   if (!hasBreadcrumbHtml || !hasBreadcrumbJson) issues.push(`${rel}: missing breadcrumbs`);
-  if (!hasFaqHtml || !hasFaqJson) issues.push(`${rel}: missing FAQ section or FAQ schema`);
-  if (calculatorLinks.length < 2) issues.push(`${rel}: missing related calculator links`);
+  if (isPlainInfoRoute && (hasFaqHtml || hasFaqJson)) issues.push(`${rel}: plain info page should not include FAQ section or FAQ schema`);
+  if (isPlainInfoRoute && /class="[^"]*\brelated-calculators\b/i.test(html)) issues.push(`${rel}: plain info page should not include a related calculators block`);
+  if (!isPlainInfoRoute && (!hasFaqHtml || !hasFaqJson)) issues.push(`${rel}: missing FAQ section or FAQ schema`);
+  if (!isPlainInfoRoute && calculatorLinks.length < 2) issues.push(`${rel}: missing related calculator links`);
   if (internalLinks.length < 5) issues.push(`${rel}: too few internal links`);
   if (jsonLdCount < 2) issues.push(`${rel}: missing schema JSON-LD`);
 
